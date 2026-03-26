@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>Cyber Escape: Protocol 2597</title>
+    <style>
+        :root {
+            --neon-green: #00ff41;
+            --neon-red: #ff3131;
+            --bg-dark: #0a0a0a;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg-dark);
+            color: var(--neon-green);
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 數位雨畫布：固定在最底層 */
+        #canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1; /* 確保在背景層 */
+        }
+
+        /* 掃描線特效 */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* 遊戲視窗 */
+        .terminal {
+            position: relative;
+            z-index: 100;
+            width: 90%;
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(0, 10, 0, 0.85);
+            border: 2px solid var(--neon-green);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .scene { display: none; }
+        .active { display: block; animation: fadeIn 0.5s; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        h1 { font-size: 1.5rem; letter-spacing: 4px; margin-bottom: 30px; }
+
+        input {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 12px;
+            font-size: 1.5rem;
+            width: 80%;
+            margin-bottom: 20px;
+            text-align: center;
+            outline: none;
+            box-shadow: inset 0 0 5px var(--neon-green);
+        }
+
+        button {
+            background: var(--neon-green);
+            color: black;
+            border: none;
+            padding: 12px 30px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: white;
+            box-shadow: 0 0 20px white;
+        }
+
+        /* 雷射防護警告 */
+        .laser-warning {
+            color: var(--neon-red);
+            border: 1px solid var(--neon-red);
+            padding: 10px;
+            margin-bottom: 20px;
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        #status { margin-top: 20px; font-size: 0.9rem; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div class="scanlines"></div>
+
+<div class="terminal">
+    <div id="scene1" class="scene active">
+        <h1>SYSTEM LOCKED</h1>
+        <p>[ 第一層級：大門授權 ]</p>
+        <p style="font-size: 0.8rem; opacity: 0.7;">提示：管理員生日是 0520</p>
+        <input type="password" id="pw1" maxlength="4" placeholder="****">
+        <br>
+        <button onclick="check1()">執行解鎖指令</button>
+    </div>
+
+    <div id="scene2" class="scene">
+        <h1 style="color: var(--neon-red);">LASER ACTIVE</h1>
+        <div class="laser-warning">⚠ 偵測到雷射防護網 ⚠</div>
+        <p>請輸入核心覆蓋代碼以取得寶物</p>
+        <input type="text" id="pw2" maxlength="4" placeholder="CODE">
+        <br>
+        <button onclick="check2()" style="background: var(--neon-red); color: white;">停用防禦系統</button>
+    </div>
+
+    <div id="scene3" class="scene">
+        <h1 style="color: gold;">ACCESS GRANTED</h1>
+        <p>數位寶物已成功解密</p>
+        <div style="font-size: 4rem; margin: 20px;">🔓💎</div>
+        <button onclick="location.reload()">重新啟動協議</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    // --- 數位雨高級版 ---
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZｦｱｳｴｵｶｷｸｹｺｻｼｽｾｿ";
+    const fontSize = 16;
+    let columns = Math.floor(width / fontSize);
+    let drops = new Array(columns).fill(0);
+
+    function draw() {
+        // 淡淡的黑色覆蓋，產生殘影效果
+        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = "#00ff41"; // 經典綠
+        ctx.font = fontSize + "px monospace";
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = characters.charAt(Math.floor(Math.random() * characters.length));
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+            if (drops[i] * fontSize > height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+    }
+
+    // 每一秒更新 30 次
+    let matrixInterval = setInterval(draw, 35);
+
+    // 視窗縮放處理
+    window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        columns = Math.floor(width / fontSize);
+        drops = new Array(columns).fill(0);
+    });
+
+    // --- 邏輯處理 ---
+    const status = document.getElementById('status');
+
+    function check1() {
+        const val = document.getElementById('pw1').value;
+        if(val === "0520") {
+            showScene(2);
+        } else {
+            errorEffect("拒絕存取：密碼錯誤");
+        }
+    }
+
+    function check2() {
+        const val = document.getElementById('pw2').value;
+        if(val === "2597") {
+            showScene(3);
+        } else {
+            errorEffect("系統警告：偵測到非法操作！");
+        }
+    }
+
+    function showScene(num) {
+        document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+        document.getElementById('scene' + num).classList.add('active');
+        status.innerText = "系統狀態：載入中...";
+        setTimeout(() => status.innerText = "系統狀態：運作中", 1000);
+    }
+
+    function errorEffect(msg) {
+        status.innerText = msg;
+        status.style.color = "red";
+        document.querySelector('.terminal').style.borderColor = "red";
+        setTimeout(() => {
+            status.style.color = "var(--neon-green)";
+            document.querySelector('.terminal').style.borderColor = "var(--neon-green)";
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>
