@@ -2,223 +2,341 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>Cyber Escape: Protocol 2597</title>
+    <title>TERMINAL: OMEGA_PROTOCOL</title>
     <style>
         :root {
-            --neon-green: #00ff41;
-            --neon-red: #ff3131;
-            --bg-dark: #0a0a0a;
+            --matrix-green: #00ff41;
+            --hacker-blue: #0088ff;
+            --alert-red: #ff3131;
+            --gold: #ffcc00;
+            --bg-black: #000a00;
+            --panel-bg: rgba(0, 15, 0, 0.9);
         }
+
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
-            background-color: var(--bg-dark);
-            color: var(--neon-green);
-            font-family: 'Segoe UI', 'Courier New', monospace;
+            background-color: var(--bg-black);
+            color: var(--matrix-green);
+            font-family: 'VT323', monospace; /* 復古終端字體 */
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
+            font-size: 1.2rem;
         }
 
-        /* 數位雨畫布：固定在最底層 */
+        /* --- 視覺基底 --- */
         #canvas {
-            position: fixed;
-            top: 0; left: 0;
+            position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
-            z-index: 1; /* 確保在背景層 */
+            z-index: 1;
+            opacity: 0.6;
         }
 
-        /* 掃描線特效 */
         .scanlines {
-            position: fixed;
-            top: 0; left: 0;
+            position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%;
-            z-index: 10;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+            background-size: 100% 3px;
+            z-index: 2;
             pointer-events: none;
         }
 
-        /* 遊戲視窗 */
-        .terminal {
+        .vignette {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 50%, black 120%);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        /* --- 遊戲主體 --- */
+        .terminal-window {
             position: relative;
-            z-index: 100;
-            width: 90%;
-            max-width: 500px;
-            padding: 40px;
-            background: rgba(0, 10, 0, 0.85);
-            border: 2px solid var(--neon-green);
-            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
-            text-align: center;
-            backdrop-filter: blur(5px);
+            z-index: 10;
+            width: 80%;
+            max-width: 650px;
+            background: var(--panel-bg);
+            border: 1px solid var(--matrix-green);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: var(--matrix-green);
+            color: black;
+            padding: 5px 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .terminal-body {
+            padding: 30px;
+            min-height: 300px;
         }
 
         .scene { display: none; }
-        .active { display: block; animation: fadeIn 0.5s; }
+        .active { display: block; }
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        h1 { font-size: 2.2rem; text-transform: uppercase; margin: 0 0 20px 0; text-shadow: 0 0 10px var(--matrix-green); }
+        p { margin: 10px 0; line-height: 1.4; }
 
-        h1 { font-size: 1.5rem; letter-spacing: 4px; margin-bottom: 30px; }
+        /* --- 輸入與按鈕 --- */
+        .cmd-input-area {
+            display: flex;
+            align-items: center;
+            margin-top: 30px;
+            border-bottom: 2px solid var(--matrix-green);
+        }
+
+        .prompt { margin-right: 10px; color: var(--matrix-green); }
 
         input {
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid var(--neon-green);
-            color: var(--neon-green);
-            padding: 12px;
-            font-size: 1.5rem;
-            width: 80%;
-            margin-bottom: 20px;
-            text-align: center;
-            outline: none;
-            box-shadow: inset 0 0 5px var(--neon-green);
-        }
-
-        button {
-            background: var(--neon-green);
-            color: black;
+            background: transparent;
             border: none;
-            padding: 12px 30px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-            transition: 0.3s;
+            color: var(--matrix-green);
+            font-family: 'VT323', monospace;
+            font-size: 1.8rem;
+            width: 100%;
+            outline: none;
+            letter-spacing: 5px;
         }
 
-        button:hover {
-            background: white;
-            box-shadow: 0 0 20px white;
+        /* 隱藏密碼輸入的預設圓點，讓它看起來像文字 */
+        input[type="password"] {
+            -webkit-text-security: disc; /* 支援特定瀏覽器 */
         }
 
-        /* 雷射防護警告 */
-        .laser-warning {
-            color: var(--neon-red);
-            border: 1px solid var(--neon-red);
-            padding: 10px;
-            margin-bottom: 20px;
-            animation: blink 0.8s infinite;
+        /* 用於展示第二關的提示 */
+        .hint { color: #555; font-size: 1rem; margin-top: 5px; }
+
+        /* 成功/失敗特效 */
+        .glitch { animation: glitch 0.3s infinite; }
+        @keyframes glitch {
+            0% { transform: translate(0); text-shadow: -2px 0 red, 2px 0 blue; }
+            50% { transform: translate(2px, -2px); text-shadow: 2px 0 red, -2px 0 blue; }
+            100% { transform: translate(0); }
         }
 
-        @keyframes blink { 50% { opacity: 0.3; } }
-
-        #status { margin-top: 20px; font-size: 0.9rem; min-height: 20px; }
+        /* 初始遮罩 */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--matrix-green); cursor: pointer;
+        }
     </style>
 </head>
-<body>
+<body onload="initCanvas()">
 
 <canvas id="canvas"></canvas>
 <div class="scanlines"></div>
+<div class="vignette"></div>
 
-<div class="terminal">
-    <div id="scene1" class="scene active">
-        <h1>SYSTEM LOCKED</h1>
-        <p>[ 第一層級：大門授權 ]</p>
-        <p style="font-size: 0.8rem; opacity: 0.7;">提示：管理員生日是 0520</p>
-        <input type="password" id="pw1" maxlength="4" placeholder="****">
-        <br>
-        <button onclick="check1()">執行解鎖指令</button>
+<audio id="snd-type" src="data:audio/wav;base64,UklGRmYAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YXIAAABYVmZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlY="></audio>
+<audio id="snd-deny" src="data:audio/wav;base64,UklGRmAAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YXIAAABIVmZWVlZWWVlWVlZZWVZWVllZVlZWWVlWVlZZWVZWVllZVlZWWVlWVlZZWVZWVllZVlZWWVlWVlZZWVZWVllZVlZWWVlWVlZZWVZWVllZdg=="></audio>
+<audio id="snd-grant" src="data:audio/wav;base64,UklGRkoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVIAAABXVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlY="></audio>
+
+<div id="boot-screen" onclick="startSystem()">
+    <h1>[ > 點擊以初始化系統 < ]</h1>
+</div>
+
+<div class="terminal-window" id="main-terminal" style="display:none;">
+    <div class="terminal-header">
+        <span>OMEGA PROTOCOL v1.0</span>
+        <span>USER: UNKNOWN</span>
     </div>
+    <div class="terminal-body">
+        
+        <div id="scene1" class="scene active">
+            <h1 id="t1_title"></h1>
+            <p id="t1_desc"></p>
+            <p style="color: #666;">(密碼提示：大門代碼為 1234)</p>
+            <div class="cmd-input-area">
+                <span class="prompt">&gt;</span>
+                <input type="password" id="pw1" maxlength="4" autofocus>
+            </div>
+        </div>
 
-    <div id="scene2" class="scene">
-        <h1 style="color: var(--neon-red);">LASER ACTIVE</h1>
-        <div class="laser-warning">⚠ 偵測到雷射防護網 ⚠</div>
-        <p>請輸入核心覆蓋代碼以取得寶物</p>
-        <input type="text" id="pw2" maxlength="4" placeholder="CODE">
-        <br>
-        <button onclick="check2()" style="background: var(--neon-red); color: white;">停用防禦系統</button>
+        <div id="scene2" class="scene">
+            <h1 id="t2_title" style="color: var(--alert-red);"></h1>
+            <p id="t2_desc"></p>
+            <p class="glitch" style="color: var(--alert-red);">【警報】探測到 0.5MW 雷射防護網已啟動。</p>
+            <div class="cmd-input-area">
+                <span class="prompt" style="color: var(--alert-red);">&gt;</span>
+                <input type="text" id="pw2" maxlength="4" style="color: var(--alert-red); border-color: var(--alert-red);">
+            </div>
+            <div class="hint">必須輸入終端密碼 (2597) 才能關閉。</div>
+        </div>
+
+        <div id="scene3" class="scene">
+            <h1 id="t3_title" style="color: gold;"></h1>
+            <p id="t3_desc"></p>
+            <div style="font-size: 5rem; text-align: center; margin: 20px 0; text-shadow: 0 0 20px gold;">💎🔓💎</div>
+            <p style="text-align: center;">任務已完成。連線將在 5 秒後切斷。</p>
+        </div>
+
+        <p id="console-log" style="color: #555; margin-top: 20px; font-size: 0.9rem;"></p>
     </div>
-
-    <div id="scene3" class="scene">
-        <h1 style="color: gold;">ACCESS GRANTED</h1>
-        <p>數位寶物已成功解密</p>
-        <div style="font-size: 4rem; margin: 20px;">🔓💎</div>
-        <button onclick="location.reload()">重新啟動協議</button>
-    </div>
-
-    <div id="status"></div>
 </div>
 
 <script>
-    // --- 數位雨高級版 ---
+    // --- 聲音控制 ---
+    const snds = {
+        type: document.getElementById('snd-type'),
+        deny: document.getElementById('snd-deny'),
+        grant: document.getElementById('snd-grant')
+    };
+
+    function playSnd(name) {
+        snds[name].currentTime = 0;
+        snds[name].play().catch(()=>{}); // 忽略未授權錯誤
+    }
+
+    // --- 終端機打字效果 ---
+    function typeWriter(elementId, text, speed = 40, callback) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = '';
+        let i = 0;
+        
+        const timer = setInterval(() => {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                if (text.charAt(i) !== ' ') playSnd('type');
+                i++;
+            } else {
+                clearInterval(timer);
+                if (callback) callback();
+            }
+        }, speed);
+    }
+
+    // --- 數位雨效果 (升級版) ---
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    let width, height, columns, drops;
 
-    let width = canvas.width = window.innerWidth;
-    let height = canvas.height = window.innerHeight;
+    function initCanvas() {
+        resize();
+        window.addEventListener('resize', resize);
+        setInterval(drawMatrix, 35);
+    }
 
-    const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZｦｱｳｴｵｶｷｸｹｺｻｼｽｾｿ";
-    const fontSize = 16;
-    let columns = Math.floor(width / fontSize);
-    let drops = new Array(columns).fill(0);
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        columns = Math.floor(width / 16);
+        drops = new Array(columns).fill(0);
+    }
 
-    function draw() {
-        // 淡淡的黑色覆蓋，產生殘影效果
-        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+    function drawMatrix() {
+        ctx.fillStyle = "rgba(0, 10, 0, 0.1)"; // 較深的背景，營造顆粒感
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = "#00ff41"; // 經典綠
-        ctx.font = fontSize + "px monospace";
+        ctx.fillStyle = "#0f0"; // 更純的綠
+        ctx.font = "16px monospace";
 
         for (let i = 0; i < drops.length; i++) {
-            const text = characters.charAt(Math.floor(Math.random() * characters.length));
-            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+            // 使用一些日文字元和數字，更像駭客任務
+            const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+            
+            // 頭部是白色的字，更亮
+            ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+            ctx.fillText(text, i * 16, drops[i] * 16);
+            
+            // 身子是綠色的
+            ctx.fillStyle = "rgba(0, 255, 65, 0.6)";
+            ctx.fillText(text, i * 16, (drops[i]-1) * 16);
 
-            if (drops[i] * fontSize > height && Math.random() > 0.975) {
+            if (drops[i] * 16 > height && Math.random() > 0.975) {
                 drops[i] = 0;
             }
             drops[i]++;
         }
     }
 
-    // 每一秒更新 30 次
-    let matrixInterval = setInterval(draw, 35);
+    // --- 遊戲邏輯 ---
+    const log = document.getElementById('console-log');
+    
+    // 監聽 Enter 鍵
+    document.getElementById('pw1').addEventListener('keypress', function(e){ if(e.key === 'Enter') check1(); });
+    document.getElementById('pw2').addEventListener('keypress', function(e){ if(e.key === 'Enter') check2(); });
 
-    // 視窗縮放處理
-    window.addEventListener('resize', () => {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
-        columns = Math.floor(width / fontSize);
-        drops = new Array(columns).fill(0);
-    });
-
-    // --- 邏輯處理 ---
-    const status = document.getElementById('status');
+    function startSystem() {
+        document.getElementById('boot-screen').style.display = 'none';
+        document.getElementById('main-terminal').style.display = 'block';
+        playSnd('grant');
+        
+        typeWriter('t1_title', '> 安全大門防禦系統');
+        setTimeout(() => {
+            typeWriter('t1_desc', '偵測到非法外來連線。請輸入第 I 層級授權碼以確認身分，否則將觸發實體封鎖協定。', 30);
+        }, 800);
+    }
 
     function check1() {
-        const val = document.getElementById('pw1').value;
-        if(val === "0520") {
-            showScene(2);
+        const input = document.getElementById('pw1');
+        if (input.value === '1234') {
+            log.innerText = "驗證成功。正在解鎖實體大門...";
+            log.style.color = "var(--matrix-green)";
+            playSnd('grant');
+            setTimeout(() => loadScene2(), 1500);
         } else {
-            errorEffect("拒絕存取：密碼錯誤");
+            input.value = '';
+            input.classList.add('glitch');
+            log.innerText = "授權拒絕。錯誤的代碼。";
+            log.style.color = "var(--alert-red)";
+            playSnd('deny');
+            setTimeout(() => input.classList.remove('glitch'), 500);
         }
+    }
+
+    function loadScene2() {
+        document.getElementById('scene1').classList.remove('active');
+        document.getElementById('scene2').classList.add('active');
+        document.getElementById('pw2').focus();
+        log.innerText = '';
+        
+        typeWriter('t2_title', '> 內部核心防禦網');
+        setTimeout(() => {
+            typeWriter('t2_desc', '大門已開啟。已進入內部迴廊。偵測到高能雷射防禦網，必須覆蓋終端協議以進行關閉。');
+        }, 800);
     }
 
     function check2() {
-        const val = document.getElementById('pw2').value;
-        if(val === "2597") {
-            showScene(3);
+        const input = document.getElementById('pw2');
+        if (input.value === '2597') {
+            log.innerText = "協議覆蓋成功。正在停用雷射網... 安全隔離開啟。";
+            log.style.color = "var(--matrix-green)";
+            document.querySelector('.terminal-window').style.borderColor = "gold";
+            playSnd('grant');
+            setTimeout(() => loadScene3(), 2000);
         } else {
-            errorEffect("系統警告：偵測到非法操作！");
+            input.value = '';
+            document.getElementById('t2_title').classList.add('glitch');
+            log.innerText = "警告：非法指令。雷射增壓中。";
+            log.style.color = "var(--alert-red)";
+            playSnd('deny');
+            setTimeout(() => document.getElementById('t2_title').classList.remove('glitch'), 1000);
         }
     }
 
-    function showScene(num) {
-        document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
-        document.getElementById('scene' + num).classList.add('active');
-        status.innerText = "系統狀態：載入中...";
-        setTimeout(() => status.innerText = "系統狀態：運作中", 1000);
-    }
-
-    function errorEffect(msg) {
-        status.innerText = msg;
-        status.style.color = "red";
-        document.querySelector('.terminal').style.borderColor = "red";
+    function loadScene3() {
+        document.getElementById('scene2').classList.remove('active');
+        document.getElementById('scene3').classList.add('active');
+        log.innerText = '';
+        
+        typeWriter('t3_title', '> 目標已取得');
         setTimeout(() => {
-            status.style.color = "var(--neon-green)";
-            document.querySelector('.terminal').style.borderColor = "var(--neon-green)";
-        }, 1000);
+            typeWriter('t3_desc', '數位寶物已成功解密並匯出。雷射系統已永久停用。做得好，特工。');
+        }, 800);
+        
+        setTimeout(() => location.reload(), 8000);
     }
 </script>
 
