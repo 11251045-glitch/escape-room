@@ -2,177 +2,188 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>2597 SYSTEM ACCESS</title>
+    <title>CRITICAL ACCESS</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            color: #0f0;
+        :root {
+            --neon: #00ff41;
+            --glitch-red: #ff003c;
+            --unlock-gold: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; overflow: hidden;
+            font-family: 'Segoe UI', 'Courier New', monospace;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* 掃描線 & 閃爍特效層 */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none; z-index: 100;
+        }
+
+        #main-ui {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            height: 100vh; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .terminal-box {
+            background: rgba(0, 20, 0, 0.9);
+            border: 1px solid var(--neon);
+            padding: 50px; text-align: center;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+            position: relative;
+        }
+
+        h2 { color: var(--neon); letter-spacing: 8px; margin-bottom: 30px; text-shadow: 0 0 10px var(--neon); }
+
+        .pass-input {
+            background: transparent; border: 2px solid var(--neon);
+            color: var(--neon); font-size: 3rem; width: 220px;
+            text-align: center; outline: none; transition: 0.3s;
             font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
         }
 
-        /* 數碼雨畫布 */
-        #matrix {
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: -1;
+        /* 成功動畫元件 */
+        #success-screen {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 50;
+            text-align: center; width: 100%;
         }
 
-        /* 掃描線效果 */
-        body::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
+        .hexagon-container {
+            width: 300px; height: 300px; margin: 0 auto;
+            position: relative; animation: rotate 10s linear infinite;
         }
 
-        /* 主介面 */
-        #ui-container {
-            background: rgba(0, 20, 0, 0.85);
-            border: 2px solid #0f0;
-            padding: 40px;
-            text-align: center;
-            box-shadow: 0 0 20px #0f0;
-            z-index: 10;
-            width: 400px;
+        .hexagon {
+            position: absolute; width: 100%; height: 100%;
+            border: 4px solid var(--unlock-gold);
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            box-shadow: 0 0 50px var(--neon);
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(0, 255, 65, 0.1);
         }
 
-        h1 {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px #0f0;
-            letter-spacing: 5px;
+        .unlock-text {
+            color: #fff; font-size: 5rem; font-weight: 900;
+            text-shadow: 0 0 30px #fff, 0 0 60px var(--neon);
+            animation: pulse 1.5s infinite;
         }
 
-        .input-area {
-            margin-top: 30px;
-        }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 
-        input {
-            background: transparent;
-            border: 1px solid #0f0;
-            color: #0f0;
-            font-size: 2em;
-            width: 150px;
-            text-align: center;
-            outline: none;
-            padding: 10px;
-            box-shadow: inset 0 0 5px #0f0;
+        /* 解鎖震盪 */
+        .shake { animation: shake 0.5s infinite; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            40% { transform: translate(3px, 2px) rotate(-1deg); }
+            100% { transform: translate(1px, -1px) rotate(0deg); }
         }
-
-        #status {
-            margin-top: 20px;
-            height: 20px;
-            font-weight: bold;
-        }
-
-        .glitch {
-            animation: glitch 1s linear infinite;
-        }
-
-        @keyframes glitch {
-            2%, 64% { transform: translate(2px, 0) skew(0deg); }
-            4%, 60% { transform: translate(-2px, 0) skew(0deg); }
-            62% { transform: translate(0, 0) skew(5deg); }
-        }
-
-        .success { color: #fff; text-shadow: 0 0 20px #0f0; border-color: #fff !important; }
     </style>
 </head>
 <body>
 
-    <canvas id="matrix"></canvas>
+<div id="overlay"></div>
+<canvas id="canvas"></canvas>
 
-    <div id="ui-container">
-        <h1 class="glitch">2597 PROTOCOL</h1>
-        <p>SECURITY LEVEL: ALPHA-4</p>
-        <hr style="border: 0.5px solid #0f0;">
-        <div class="input-area">
-            <p>INPUT ACCESS CODE:</p>
-            <input type="password" id="passcode" maxlength="4" autocomplete="off">
-        </div>
-        <div id="status">WAITING FOR INPUT...</div>
+<div id="main-ui">
+    <div class="terminal-box" id="box">
+        <h2 id="header">CORE SYSTEM</h2>
+        <input type="text" class="pass-input" id="pass" maxlength="4" placeholder="****" autofocus>
+        <p id="hint" style="color: #006622; margin-top: 20px;">SECURITY STATUS: ENCRYPTED</p>
     </div>
+</div>
 
-    <script>
-        // --- 數碼雨腳本 ---
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
+<div id="success-screen">
+    <div class="hexagon-container">
+        <div class="hexagon"><span class="unlock-text">2597</span></div>
+    </div>
+    <h1 style="color: #fff; font-size: 3rem; margin-top: 40px; letter-spacing: 15px;">ACCESS GRANTED</h1>
+    <p style="color: var(--neon); font-size: 1.2rem;">DECRYPTING CORE DATABASE...</p>
+</div>
 
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let matrixSpeed = 1;
+    const fontSize = 18;
+    const columns = canvas.width / fontSize;
+    const drops = Array(Math.floor(columns)).fill(1);
+    const chars = "2597";
+
+    function draw() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#0F0";
+        ctx.font = fontSize + "px monospace";
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i] += matrixSpeed;
+        }
+    }
+    let interval = setInterval(draw, 33);
+
+    // 邏輯控制
+    const passInput = document.getElementById('pass');
+    const mainUI = document.getElementById('main-ui');
+    const successScreen = document.getElementById('success-screen');
+    const box = document.getElementById('box');
+
+    passInput.addEventListener('input', (e) => {
+        if (e.target.value === '2597') {
+            triggerSuccess();
+        }
+    });
+
+    function triggerSuccess() {
+        // 1. UI 消失與震盪
+        passInput.disabled = true;
+        box.classList.add('shake');
+        box.style.borderColor = "#fff";
+        box.style.boxShadow = "0 0 100px #fff";
+        
+        // 2. 數碼雨加速
+        matrixSpeed = 10;
+        
+        setTimeout(() => {
+            mainUI.style.opacity = '0';
+            mainUI.style.transform = 'scale(0.5)';
+            
+            setTimeout(() => {
+                mainUI.style.display = 'none';
+                successScreen.style.display = 'block';
+                document.body.style.backgroundColor = '#001100';
+                
+                // 3. 終極背景變化
+                ctx.fillStyle = "#fff";
+                canvas.style.filter = "blur(1px) contrast(2)";
+                
+                // 模擬系統「解鎖」聲響效果（如需要可加 Audio）
+                console.log("SYSTEM UNLOCKED");
+            }, 600);
+        }, 1000);
+    }
+
+    window.onresize = () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+    }
+</script>
 
-        const nums = "2597"; // 只使用 2597 組成數碼雨
-        const fontSize = 16;
-        const columns = canvas.width / fontSize;
-        const drops = Array(Math.floor(columns)).fill(1);
-
-        function drawMatrix() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = "#0f0";
-            ctx.font = fontSize + "px monospace";
-
-            for (let i = 0; i < drops.length; i++) {
-                const text = nums.charAt(Math.floor(Math.random() * nums.length));
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                    drops[i] = 0;
-                }
-                drops[i]++;
-            }
-        }
-
-        setInterval(drawMatrix, 50);
-
-        // --- 密碼邏輯 ---
-        const input = document.getElementById('passcode');
-        const status = document.getElementById('status');
-        const container = document.getElementById('ui-container');
-
-        input.addEventListener('input', () => {
-            if (input.value === '2597') {
-                status.innerText = "ACCESS GRANTED - SYSTEM UNLOCKED";
-                status.style.color = "#fff";
-                input.classList.add('success');
-                container.style.boxShadow = "0 0 50px #fff";
-                input.disabled = true;
-                
-                // 觸發解鎖後的特效
-                triggerUnlock();
-            } else if (input.value.length === 4) {
-                status.innerText = "ACCESS DENIED - RETRY";
-                status.style.color = "red";
-                input.value = "";
-                setTimeout(() => {
-                    status.innerText = "WAITING FOR INPUT...";
-                    status.style.color = "#0f0";
-                }, 2000);
-            }
-        });
-
-        function triggerUnlock() {
-            // 這裡可以加入串接其他機關的指令，例如發送 Webhook
-            console.log("Unlock signal sent!");
-        }
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-    </script>
 </body>
 </html>
